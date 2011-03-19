@@ -2,6 +2,8 @@
 from direct.showbase.ShowBase import ShowBase
 from direct.actor.Actor import Actor
 from pandac.PandaModules import PointLight
+from pandac.PandaModules import loadPrcFileData
+loadPrcFileData('', 'win-size 960 600')
 
 class FreeBLiTZ(ShowBase):
 
