@@ -18,6 +18,7 @@ class FreeBLiTZ(ShowBase):
 
         base.cam.reparentTo(self.blockchar)
         base.cam.setPos(2, -10, 7)
+        base.cam.lookAt(2, 0, 7)
 
         self.light = PointLight('plight')
         self.lightNP = self.stage.attachNewNode(self.light)
@@ -41,21 +42,32 @@ class FreeBLiTZ(ShowBase):
         self.look = False
         self.prev_pos = None
         self.cam_angle = 3.14159
+        self.cam_elevation = 0
         self.taskMgr.add(self.MouseTask, 'MouseTask')
 
     def move_forward(self):
+        h = self.blockchar.getH()
+        self.blockchar.setH(h * .95 + 0 * .05)
         self.blockchar.setFluidPos(self.blockchar, 0, 0.2, 0)
         self.cam_angle = self.cam_angle * .95 + 3.14159 * .05
 
     def move_left(self):
-        self.blockchar.setFluidPos(self.blockchar, -0.2, 0, 0)
+        h = self.blockchar.getH()
+        self.blockchar.setH(h * .95 + 90 * .05)
+        self.blockchar.setFluidPos(self.blockchar, 0, 0.2, 0)
+        self.cam_angle = self.cam_angle * .95 + (3.14159 * 3 / 2) * .05
 
     def move_backward(self):
-        self.blockchar.setFluidPos(self.blockchar, 0, -0.2, 0)
-        self.cam_angle = self.cam_angle * .95 + 3.14159 * .05
+        h = self.blockchar.getH()
+        self.blockchar.setH(h * .95 - 180 * .05)
+        self.blockchar.setFluidPos(self.blockchar, 0, 0.2, 0)
+        self.cam_angle = self.cam_angle * .95 + (3.14159 * 0) * .05
 
     def move_right(self):
-        self.blockchar.setFluidPos(self.blockchar, 0.2, 0, 0)
+        h = self.blockchar.getH()
+        self.blockchar.setH(h * .95 + -90 * .05)
+        self.blockchar.setFluidPos(self.blockchar, 0, 0.2, 0)
+        self.cam_angle = self.cam_angle * .95 + (3.14159 / 2) * .05
 
     def begin_spin(self):
         self.spin = True
@@ -78,19 +90,17 @@ class FreeBLiTZ(ShowBase):
             if self.prev_pos:
                 if self.spin:
                     self.blockchar.setH(self.blockchar, (self.prev_pos[0] - x) * 180)
-                    self.cam.setP(self.cam, (y - self.prev_pos[1]) * 90)
+                    self.cam_elevation = y * 90
                 elif self.look:
                     self.cam_angle = self.cam_angle - (self.prev_pos[0] - x) * 10
                     if self.cam_angle >= 3.14159 * 2:
                         self.cam_angle -= 3.14159 * 2
-                    if self.cam_angle <= 0:
+                    if self.cam_angle < 0:
                         self.cam_angle += 3.14159 * 2
-            print self.cam_angle
-            self.cam.setPos(sin(self.cam_angle) * 10, cos(self.cam_angle) * 10, 7)
+                    self.cam_elevation = y * 90
+            self.cam.setPos(2 + sin(self.cam_angle) * 10, cos(self.cam_angle) * 10, 7)
             self.cam.lookAt(2, 0, 7)
-            if self.prev_pos:
-                if self.look:
-                    self.cam.setP((y) * 90)
+            self.cam.setP(self.cam_elevation)
             self.prev_pos = (x, y)
         return task.cont
 
