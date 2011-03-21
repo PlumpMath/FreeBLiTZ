@@ -16,9 +16,9 @@ class FreeBLiTZ(ShowBase):
         self.blockchar = Actor('models/blockchar')
         self.blockchar.reparentTo(self.stage)
 
-        base.cam.reparentTo(self.blockchar)
-        base.cam.setPos(2, -10, 7)
-        base.cam.lookAt(2, 0, 7)
+        self.cam.reparentTo(self.stage)
+        self.cam.setPos(self.blockchar, 2, -10, 7)
+        self.cam.lookAt(self.blockchar, 2, 0, 7)
 
         self.light = PointLight('plight')
         self.lightNP = self.stage.attachNewNode(self.light)
@@ -47,27 +47,39 @@ class FreeBLiTZ(ShowBase):
 
     def move_forward(self):
         h = self.blockchar.getH()
-        self.blockchar.setH(h * .95 + 0 * .05)
+        cam_h = self.cam.getH()
+        self.blockchar.setH(cam_h)
         self.blockchar.setFluidPos(self.blockchar, 0, 0.2, 0)
-        self.cam_angle = self.cam_angle * .95 + 3.14159 * .05
+        self.blockchar.setH(h * .85 + (cam_h + 0) * .15)
+        self.cam.setPos(self.blockchar, 2, -10, 7)
+        self.cam.setH(self.blockchar, 0)
 
     def move_left(self):
         h = self.blockchar.getH()
-        self.blockchar.setH(h * .95 + 90 * .05)
-        self.blockchar.setFluidPos(self.blockchar, 0, 0.2, 0)
-        self.cam_angle = self.cam_angle * .95 + (3.14159 * 3 / 2) * .05
+        cam_h = self.cam.getH()
+        self.blockchar.setH(cam_h)
+        self.blockchar.setFluidPos(self.blockchar, -0.2, 0, 0)
+        self.blockchar.setH(h * .85 + (cam_h + 90) * .15)
+        self.cam.setPos(self.blockchar, 2, -10, 7)
+        self.cam.setH(self.blockchar, 0)
 
     def move_backward(self):
         h = self.blockchar.getH()
-        self.blockchar.setH(h * .95 - 180 * .05)
-        self.blockchar.setFluidPos(self.blockchar, 0, 0.2, 0)
-        self.cam_angle = self.cam_angle * .95 + (3.14159 * 0) * .05
+        cam_h = self.cam.getH()
+        self.blockchar.setH(cam_h)
+        self.blockchar.setFluidPos(self.blockchar, 0, -0.2, 0)
+        self.blockchar.setH(h * .85 + (cam_h + 180) * .15)
+        self.cam.setPos(self.blockchar, 2, -10, 7)
+        self.cam.setH(self.blockchar, 0)
 
     def move_right(self):
         h = self.blockchar.getH()
-        self.blockchar.setH(h * .95 + -90 * .05)
-        self.blockchar.setFluidPos(self.blockchar, 0, 0.2, 0)
-        self.cam_angle = self.cam_angle * .95 + (3.14159 / 2) * .05
+        cam_h = self.cam.getH()
+        self.blockchar.setH(cam_h)
+        self.blockchar.setFluidPos(self.blockchar, 0.2, 0, 0)
+        self.blockchar.setH(h * .85 + (cam_h - 90) * .15)
+        self.cam.setPos(self.blockchar, 2, -10, 7)
+        self.cam.setH(self.blockchar, 0)
 
     def begin_spin(self):
         self.spin = True
@@ -90,16 +102,18 @@ class FreeBLiTZ(ShowBase):
             if self.prev_pos:
                 if self.spin:
                     self.blockchar.setH(self.blockchar, (self.prev_pos[0] - x) * 180)
-                    self.cam_elevation = y * 90
+                    self.cam.setPos(self.blockchar, 2, -10, 7)
+                    self.cam.setH(self.blockchar, 0)
+                    self.cam_elevation = self.cam_elevation - (self.prev_pos[1] - y) * 90
                 elif self.look:
                     self.cam_angle = self.cam_angle - (self.prev_pos[0] - x) * 10
                     if self.cam_angle >= 3.14159 * 2:
                         self.cam_angle -= 3.14159 * 2
                     if self.cam_angle < 0:
                         self.cam_angle += 3.14159 * 2
-                    self.cam_elevation = y * 90
-            self.cam.setPos(2 + sin(self.cam_angle) * 10, cos(self.cam_angle) * 10, 7)
-            self.cam.lookAt(2, 0, 7)
+                    self.cam_elevation = self.cam_elevation - (self.prev_pos[1] - y) * 90
+                    self.cam.setPos(2 + sin(self.cam_angle) * 10, cos(self.cam_angle) * 10, 7)
+                    self.cam.lookAt(2, 0, 7)
             self.cam.setP(self.cam_elevation)
             self.prev_pos = (x, y)
         return task.cont
