@@ -4,6 +4,7 @@ from direct.actor.Actor import Actor
 from pandac.PandaModules import PointLight
 from pandac.PandaModules import loadPrcFileData
 loadPrcFileData('', 'win-size 960 600')
+loadPrcFileData('', 'interpolate-frames 1')
 
 class FreeBLiTZ(ShowBase):
 
@@ -16,13 +17,13 @@ class FreeBLiTZ(ShowBase):
         # Character rig, which allows camera to follow character
         self.char_rig = self.stage.attachNewNode('char_rig')
 
-        self.blockchar = Actor('models/blockchar')
+        self.blockchar = Actor('models/robot3', {'run': 'models/robot3-run'})
         self.blockchar.reparentTo(self.char_rig)
         self.blockchar.setCompass()
 
         self.cam.reparentTo(self.char_rig)
-        self.cam.setPos(2, -14, 7)
-        self.cam.lookAt(2, 0, 7)
+        self.cam.setPos(0.5, -3, 1.5)
+        self.cam.lookAt(0.5, 0, 1.5)
 
         self.light = PointLight('plight')
         self.lightNP = self.stage.attachNewNode(self.light)
@@ -59,15 +60,19 @@ class FreeBLiTZ(ShowBase):
 
     def begin_forward(self):
         self.move_forward = True
+        self.blockchar.loop('run')
 
     def begin_left(self):
         self.move_left = True
+        self.blockchar.loop('run')
 
     def begin_backward(self):
         self.move_backward = True
+        self.blockchar.loop('run')
 
     def begin_right(self):
         self.move_right = True
+        self.blockchar.loop('run')
 
     def end_forward(self):
         self.move_forward = False
@@ -131,10 +136,6 @@ class FreeBLiTZ(ShowBase):
             if heading % 90 == 45:
                 speed = 0.70710678118654746 * speed
 
-            # TODO: Scale Blender models instead of scaling movement speed.
-            # Scale movement speed as if a blender unit were 1 meter
-            speed *= 8 / 1.7
-
             if heading == 0:
                 vector = (0, speed, 0)
             elif heading == 45:
@@ -157,6 +158,8 @@ class FreeBLiTZ(ShowBase):
             self.blockchar.setH(self.avg_deg_sign(h, rig_h + heading))
             self.moving = True
             self.char_rig.setPos(self.char_rig, *vector)
+        else:
+            self.blockchar.stop()
         self.move_prev_time = task.time
         return task.cont
 
