@@ -13,12 +13,16 @@ class FreeBLiTZ(ShowBase):
         self.stage = self.loader.loadModel('models/sandbox')
         self.stage.reparentTo(self.render)
 
-        self.blockchar = Actor('models/blockchar')
-        self.blockchar.reparentTo(self.stage)
+        # Character rig, which allows camera to follow character
+        self.char_rig = self.stage.attachNewNode('char_rig')
 
-        self.cam.reparentTo(self.stage)
-        self.cam.setPos(self.blockchar, 2, -10, 7)
-        self.cam.lookAt(self.blockchar, 2, 0, 7)
+        self.blockchar = Actor('models/blockchar')
+        self.blockchar.reparentTo(self.char_rig)
+        self.blockchar.setCompass()
+
+        self.cam.reparentTo(self.char_rig)
+        self.cam.setPos(2, -10, 7)
+        self.cam.lookAt(2, 0, 7)
 
         self.light = PointLight('plight')
         self.lightNP = self.stage.attachNewNode(self.light)
@@ -41,45 +45,33 @@ class FreeBLiTZ(ShowBase):
         self.spin = False
         self.look = False
         self.prev_pos = None
-        self.cam_angle = 3.14159
-        self.cam_elevation = 0
         self.taskMgr.add(self.MouseTask, 'MouseTask')
+
+        self.move_speed = 0.3
 
     def move_forward(self):
         h = self.blockchar.getH()
-        cam_h = self.cam.getH()
-        self.blockchar.setH(cam_h)
-        self.blockchar.setFluidPos(self.blockchar, 0, 0.2, 0)
-        self.blockchar.setH(h * .85 + (cam_h + 0) * .15)
-        self.cam.setPos(self.blockchar, 2, -10, 7)
-        self.cam.setH(self.blockchar, 0)
+        rig_h = self.char_rig.getH()
+        self.blockchar.setH(self.avg_deg_sign(h, rig_h))
+        self.char_rig.setPos(self.char_rig, 0, self.move_speed, 0)
 
     def move_left(self):
         h = self.blockchar.getH()
-        cam_h = self.cam.getH()
-        self.blockchar.setH(cam_h)
-        self.blockchar.setFluidPos(self.blockchar, -0.2, 0, 0)
-        self.blockchar.setH(h * .85 + (cam_h + 90) * .15)
-        self.cam.setPos(self.blockchar, 2, -10, 7)
-        self.cam.setH(self.blockchar, 0)
+        rig_h = self.char_rig.getH()
+        self.blockchar.setH(self.avg_deg_sign(h, (rig_h + 90)))
+        self.char_rig.setPos(self.char_rig, -self.move_speed, 0, 0)
 
     def move_backward(self):
         h = self.blockchar.getH()
-        cam_h = self.cam.getH()
-        self.blockchar.setH(cam_h)
-        self.blockchar.setFluidPos(self.blockchar, 0, -0.2, 0)
-        self.blockchar.setH(h * .85 + (cam_h + 180) * .15)
-        self.cam.setPos(self.blockchar, 2, -10, 7)
-        self.cam.setH(self.blockchar, 0)
+        rig_h = self.char_rig.getH()
+        self.blockchar.setH(self.avg_deg_sign(h, (rig_h + 180)))
+        self.char_rig.setPos(self.char_rig, 0, -self.move_speed, 0)
 
     def move_right(self):
         h = self.blockchar.getH()
-        cam_h = self.cam.getH()
-        self.blockchar.setH(cam_h)
-        self.blockchar.setFluidPos(self.blockchar, 0.2, 0, 0)
-        self.blockchar.setH(h * .85 + (cam_h - 90) * .15)
-        self.cam.setPos(self.blockchar, 2, -10, 7)
-        self.cam.setH(self.blockchar, 0)
+        rig_h = self.char_rig.getH()
+        self.blockchar.setH(self.avg_deg_sign(h, (rig_h - 90)))
+        self.char_rig.setPos(self.char_rig, self.move_speed, 0, 0)
 
     def begin_spin(self):
         self.spin = True
@@ -95,26 +87,29 @@ class FreeBLiTZ(ShowBase):
         self.look = False
         self.prev_pos = None
 
+    def clamp_deg_sign(self, heading):
+        return (heading + 180) % 360 - 180
+
+    def avg_deg_sign(self, heading1, heading2):
+        if heading2 - heading1 > 180:
+            heading2 -= 360
+        if heading2 - heading1 < -180:
+            heading2 += 360
+        return self.clamp_deg_sign(.85 * heading1 + .15 * heading2)
+
     def MouseTask(self, task):
-        from math import sin, cos
         if self.mouseWatcherNode.hasMouse():
             (x, y) = self.mouseWatcherNode.getMouse()
             if self.prev_pos:
+                if self.look or self.spin:
+                    h_diff = (x - self.prev_pos[0]) * 180
+                    p_diff = (y - self.prev_pos[1]) * 90
+                    new_h = self.clamp_deg_sign(self.char_rig.getH() - h_diff)
+                    self.char_rig.setH(new_h)
+                    self.cam.setP(self.cam.getP() + p_diff)
                 if self.spin:
-                    self.blockchar.setH(self.blockchar, (self.prev_pos[0] - x) * 180)
-                    self.cam.setPos(self.blockchar, 2, -10, 7)
-                    self.cam.setH(self.blockchar, 0)
-                    self.cam_elevation = self.cam_elevation - (self.prev_pos[1] - y) * 90
-                elif self.look:
-                    self.cam_angle = self.cam_angle - (self.prev_pos[0] - x) * 10
-                    if self.cam_angle >= 3.14159 * 2:
-                        self.cam_angle -= 3.14159 * 2
-                    if self.cam_angle < 0:
-                        self.cam_angle += 3.14159 * 2
-                    self.cam_elevation = self.cam_elevation - (self.prev_pos[1] - y) * 90
-                    self.cam.setPos(2 + sin(self.cam_angle) * 10, cos(self.cam_angle) * 10, 7)
-                    self.cam.lookAt(2, 0, 7)
-            self.cam.setP(self.cam_elevation)
+                    char_new_h = self.avg_deg_sign(self.blockchar.getH(), new_h)
+                    self.blockchar.setH(char_new_h)
             self.prev_pos = (x, y)
         return task.cont
 
