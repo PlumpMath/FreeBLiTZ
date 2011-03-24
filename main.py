@@ -9,25 +9,43 @@ loadPrcFileData('', 'interpolate-frames 1')
 class FreeBLiTZ(ShowBase):
 
     def __init__(self):
-        from pandac.PandaModules import GeomNode, CollisionNode, CollisionRay, CollisionSphere, CollisionTraverser, CollisionHandlerFloor, CollisionHandlerPusher
+        from pandac.PandaModules import CollisionNode, CollisionRay, CollisionSphere, CollisionTraverser, BitMask32
+        from pandac.PandaModules import CollisionHandlerFloor, CollisionHandlerPusher, CollisionHandlerEvent
         ShowBase.__init__(self)
 
-        self.stage = self.loader.loadModel('models/sandbox2')
+        FLOOR_MASK = BitMask32(1)
+        OBSTACLE_MASK = BitMask32(2)
+        ZONE_MASK = BitMask32(4)
+
+        self.stage = self.loader.loadModel('models/sandbox3')
+        self.floor = self.stage.find('**/=CollideType=floor')
+        self.floor.setCollideMask(FLOOR_MASK)
+        self.obstacles = self.stage.find('**/=CollideType=obstacle')
+        self.obstacles.setCollideMask(OBSTACLE_MASK)
+        self.zones = self.stage.find('**/=CollideType=zone')
+        self.zones.setCollideMask(ZONE_MASK)
         self.stage.reparentTo(self.render)
 
         # Character rig, which allows camera to follow character
         self.char_rig = self.stage.attachNewNode('char_rig')
 
         self.blockchar = Actor('models/robot3', {'run': 'models/robot3-run'})
+        self.blockchar.setPlayRate(2.0, 'run')
         self.blockchar.reparentTo(self.char_rig)
         self.blockchar.setCompass()
         self.blockchar.setCollideMask(0)
-        self.blockchar_from_ray = self.blockchar.attachNewNode(CollisionNode('blockchar_ray'))
-        self.blockchar_from_ray.node().addSolid(CollisionRay(0, 0, 0.1, 0, 0, -10))
-        self.blockchar_from_ray.node().setFromCollideMask(GeomNode.getDefaultCollideMask())
-        self.blockchar_from_sph = self.blockchar.attachNewNode(CollisionNode('blockchar_sph'))
-        self.blockchar_from_sph.node().addSolid(CollisionSphere(0, 0, 0.85, 0.85))
-        self.blockchar_from_sph.node().setFromCollideMask(GeomNode.getDefaultCollideMask())
+        self.blockchar_from_floor = self.blockchar.attachNewNode(CollisionNode('blockchar_floor'))
+        self.blockchar_from_floor.node().addSolid(CollisionRay(0, 0, 0.1, 0, 0, -10))
+        self.blockchar_from_floor.node().setCollideMask(0)
+        self.blockchar_from_floor.node().setFromCollideMask(FLOOR_MASK)
+        self.blockchar_from_obstacle = self.blockchar.attachNewNode(CollisionNode('blockchar_obstacle'))
+        self.blockchar_from_obstacle.node().addSolid(CollisionSphere(0, 0, 0.85, 0.85))
+        self.blockchar_from_obstacle.node().setCollideMask(0)
+        self.blockchar_from_obstacle.node().setFromCollideMask(OBSTACLE_MASK)
+        self.blockchar_from_zone = self.blockchar.attachNewNode(CollisionNode('blockchar_zone'))
+        self.blockchar_from_zone.node().addSolid(CollisionSphere(0, 0, 0.55, 0.55))
+        self.blockchar_from_zone.node().setCollideMask(0)
+        self.blockchar_from_zone.node().setFromCollideMask(ZONE_MASK)
 
         self.cam.reparentTo(self.char_rig)
         self.cam.setPos(0.5, -3, 1.5)
@@ -67,12 +85,22 @@ class FreeBLiTZ(ShowBase):
         self.move_speed = 2.7 # m/s
 
         self.floor_handler = CollisionHandlerFloor()
-        self.floor_handler.addCollider(self.blockchar_from_ray, self.char_rig)
+        self.floor_handler.addCollider(self.blockchar_from_floor, self.char_rig)
         self.wall_handler = CollisionHandlerPusher()
-        self.wall_handler.addCollider(self.blockchar_from_sph, self.char_rig)
+        self.wall_handler.addCollider(self.blockchar_from_obstacle, self.char_rig)
+        self.zone_handler = CollisionHandlerEvent()
+        self.zone_handler.addInPattern('%fn-into-%in')
+        self.zone_handler.addOutPattern('%fn-out-%in')
+        def foo(entry):
+            print 'You are in the zone'
+        def bar(entry):
+            print 'You are not in the zone'
+        self.accept('blockchar_zone-into-Cube', foo)
+        self.accept('blockchar_zone-out-Cube', bar)
         self.cTrav = CollisionTraverser('main traverser')
-        self.cTrav.addCollider(self.blockchar_from_ray, self.floor_handler)
-        self.cTrav.addCollider(self.blockchar_from_sph, self.wall_handler)
+        self.cTrav.addCollider(self.blockchar_from_floor, self.floor_handler)
+        self.cTrav.addCollider(self.blockchar_from_obstacle, self.wall_handler)
+        self.cTrav.addCollider(self.blockchar_from_zone, self.zone_handler)
         #self.cTrav.showCollisions(self.stage)
 
     def begin_forward(self):
