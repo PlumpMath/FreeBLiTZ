@@ -19,7 +19,7 @@ class FreeBLiTZ(ShowBase):
 
         self.sky = self.loader.loadModel('models/sky-sphere')
         self.sky.reparentTo(self.render)
-        self.stage = self.loader.loadModel('models/hillside-road002')
+        self.stage = self.loader.loadModel('models/hillside-road003')
         self.stage.reparentTo(self.render)
         self.floor = self.stage.findAllMatches('**/=CollideType=floor')
         self.floor.setCollideMask(FLOOR_MASK)
