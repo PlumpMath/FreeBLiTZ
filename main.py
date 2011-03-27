@@ -25,7 +25,6 @@ class FreeBLiTZ(ShowBase):
         self.floor.setCollideMask(FLOOR_MASK)
         self.obstacles = self.stage.findAllMatches('**/=CollideType=obstacle')
         if self.obstacles:
-            print self.obstacles
             self.obstacles.setCollideMask(OBSTACLE_MASK)
         self.zones = self.stage.findAllMatches('**/=CollideType=zone')
         if self.zones:
@@ -44,7 +43,7 @@ class FreeBLiTZ(ShowBase):
         self.blockchar_from_floor.node().setCollideMask(0)
         self.blockchar_from_floor.node().setFromCollideMask(FLOOR_MASK)
         self.blockchar_from_obstacle = self.blockchar.attachNewNode(CollisionNode('blockchar_obstacle'))
-        self.blockchar_from_obstacle.node().addSolid(CollisionSphere(0, 0, 0.85, 0.85))
+        self.blockchar_from_obstacle.node().addSolid(CollisionSphere(0, 0, 0.35, 0.35))
         self.blockchar_from_obstacle.node().setCollideMask(0)
         self.blockchar_from_obstacle.node().setFromCollideMask(OBSTACLE_MASK)
         self.blockchar_from_zone = self.blockchar.attachNewNode(CollisionNode('blockchar_zone'))
@@ -100,15 +99,16 @@ class FreeBLiTZ(ShowBase):
         self.wall_handler = CollisionHandlerPusher()
         self.wall_handler.addCollider(self.blockchar_from_obstacle, self.char_rig)
         self.zone_handler = CollisionHandlerEvent()
-        self.zone_handler.addInPattern('%fn-into-%in')
-        self.zone_handler.addOutPattern('%fn-out-%in')
+        self.zone_handler.addInPattern('%fn-into')
+        self.zone_handler.addOutPattern('%fn-out')
         def foo(entry):
             print 'You are in the zone'
         def bar(entry):
             print 'You are not in the zone'
-        self.accept('blockchar_zone-into-Cube', foo)
-        self.accept('blockchar_zone-out-Cube', bar)
+        self.accept('blockchar_zone-into', foo)
+        self.accept('blockchar_zone-out', bar)
         self.cTrav = CollisionTraverser('main traverser')
+        self.cTrav.setRespectPrevTransform(True)
         self.cTrav.addCollider(self.blockchar_from_floor, self.floor_handler)
         self.cTrav.addCollider(self.blockchar_from_obstacle, self.wall_handler)
         self.cTrav.addCollider(self.blockchar_from_zone, self.zone_handler)
