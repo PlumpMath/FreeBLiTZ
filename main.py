@@ -56,13 +56,13 @@ class FreeBLiTZ(ShowBase):
         self.cam.lookAt(0.5, 0, 1.5)
 
         self.light = DirectionalLight('dlight')
-        self.light.setColor(VBase4(0.6, 0.58, 0.56, 1.0))
+        self.light.setColor(VBase4(0.3, 0.28, 0.26, 1.0))
         self.lightNP = self.stage.attachNewNode(self.light)
         self.lightNP.setHpr(-75, -45, 0)
         self.stage.setLight(self.lightNP)
 
         self.amblight = AmbientLight('amblight')
-        self.amblight.setColor(VBase4(0.4, 0.38, 0.36, 1.0))
+        self.amblight.setColor(VBase4(0.7, 0.68, 0.66, 1.0))
         self.amblightNP = self.stage.attachNewNode(self.amblight)
         self.stage.setLight(self.amblightNP)
 
