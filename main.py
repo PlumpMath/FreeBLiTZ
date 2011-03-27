@@ -1,7 +1,6 @@
 #!/usr/bin/python
 from direct.showbase.ShowBase import ShowBase
 from direct.actor.Actor import Actor
-from pandac.PandaModules import PointLight
 from pandac.PandaModules import loadPrcFileData
 loadPrcFileData('', 'win-size 960 600')
 loadPrcFileData('', 'interpolate-frames 1')
@@ -11,20 +10,25 @@ class FreeBLiTZ(ShowBase):
     def __init__(self):
         from pandac.PandaModules import CollisionNode, CollisionRay, CollisionSphere, CollisionTraverser, BitMask32
         from pandac.PandaModules import CollisionHandlerFloor, CollisionHandlerPusher, CollisionHandlerEvent
+        from pandac.PandaModules import DirectionalLight, AmbientLight, VBase4
         ShowBase.__init__(self)
 
         FLOOR_MASK = BitMask32(1)
         OBSTACLE_MASK = BitMask32(2)
         ZONE_MASK = BitMask32(4)
 
-        self.stage = self.loader.loadModel('models/sandbox3')
+        self.sky = self.loader.loadModel('models/sky-sphere')
+        self.sky.reparentTo(self.render)
+        self.stage = self.loader.loadModel('models/hillside-road')
+        self.stage.reparentTo(self.render)
         self.floor = self.stage.find('**/=CollideType=floor')
         self.floor.setCollideMask(FLOOR_MASK)
         self.obstacles = self.stage.find('**/=CollideType=obstacle')
-        self.obstacles.setCollideMask(OBSTACLE_MASK)
+        if self.obstacles:
+            self.obstacles.setCollideMask(OBSTACLE_MASK)
         self.zones = self.stage.find('**/=CollideType=zone')
-        self.zones.setCollideMask(ZONE_MASK)
-        self.stage.reparentTo(self.render)
+        if self.zones:
+            self.zones.setCollideMask(ZONE_MASK)
 
         # Character rig, which allows camera to follow character
         self.char_rig = self.stage.attachNewNode('char_rig')
@@ -51,10 +55,16 @@ class FreeBLiTZ(ShowBase):
         self.cam.setPos(0.5, -3, 1.5)
         self.cam.lookAt(0.5, 0, 1.5)
 
-        self.light = PointLight('plight')
+        self.light = DirectionalLight('dlight')
+        self.light.setColor(VBase4(0.6, 0.58, 0.56, 1.0))
         self.lightNP = self.stage.attachNewNode(self.light)
-        self.lightNP.setPos(5, 5, 5)
+        self.lightNP.setHpr(-75, -45, 0)
         self.stage.setLight(self.lightNP)
+
+        self.amblight = AmbientLight('amblight')
+        self.amblight.setColor(VBase4(0.4, 0.38, 0.36, 1.0))
+        self.amblightNP = self.stage.attachNewNode(self.amblight)
+        self.stage.setLight(self.amblightNP)
 
         self.move_forward = False
         self.move_left = False
