@@ -1,134 +1,73 @@
 #!/usr/bin/python
 from direct.showbase.ShowBase import ShowBase
+from direct.showbase.DirectObject import DirectObject
 from direct.actor.Actor import Actor
-from pandac.PandaModules import loadPrcFileData
+from pandac.PandaModules import loadPrcFileData, BitMask32
 loadPrcFileData('', 'win-size 960 600')
 loadPrcFileData('', 'interpolate-frames 1')
 
-class FreeBLiTZ(ShowBase):
+FLOOR_MASK = BitMask32(1)
+OBSTACLE_MASK = BitMask32(2)
+ZONE_MASK = BitMask32(4)
 
-    def __init__(self):
-        from pandac.PandaModules import CollisionNode, CollisionRay, CollisionSphere, CollisionTraverser, BitMask32
-        from pandac.PandaModules import CollisionHandlerFloor, CollisionHandlerPusher, CollisionHandlerEvent
-        from pandac.PandaModules import DirectionalLight, AmbientLight, VBase4
-        ShowBase.__init__(self)
+def clamp_deg_sign(heading):
+    return (heading + 180) % 360 - 180
 
-        FLOOR_MASK = BitMask32(1)
-        OBSTACLE_MASK = BitMask32(2)
-        ZONE_MASK = BitMask32(4)
+def avg_deg_sign(heading1, heading2):
+    if heading2 - heading1 > 180:
+        heading2 -= 360
+    if heading2 - heading1 < -180:
+        heading2 += 360
+    return clamp_deg_sign(.85 * heading1 + .15 * heading2)
 
-        self.sky = self.loader.loadModel('models/sky-sphere')
-        self.sky.reparentTo(self.render)
-        self.stage = self.loader.loadModel('models/hillside-road003')
-        self.stage.reparentTo(self.render)
-        self.floor = self.stage.findAllMatches('**/=CollideType=floor')
-        self.floor.setCollideMask(FLOOR_MASK)
-        self.obstacles = self.stage.findAllMatches('**/=CollideType=obstacle')
-        if self.obstacles:
-            self.obstacles.setCollideMask(OBSTACLE_MASK)
-        self.zones = self.stage.findAllMatches('**/=CollideType=zone')
-        if self.zones:
-            self.zones.setCollideMask(ZONE_MASK)
 
-        # Character rig, which allows camera to follow character
-        self.char_rig = self.stage.attachNewNode('char_rig')
-
-        self.blockchar = Actor('models/robot3', {'run': 'models/robot3-run'})
-        self.blockchar.setPlayRate(2.0, 'run')
-        self.blockchar.reparentTo(self.char_rig)
-        self.blockchar.setCompass()
-        self.blockchar.setCollideMask(0)
-        self.blockchar_from_floor = self.blockchar.attachNewNode(CollisionNode('blockchar_floor'))
-        self.blockchar_from_floor.node().addSolid(CollisionRay(0, 0, 0.1, 0, 0, -10))
-        self.blockchar_from_floor.node().setCollideMask(0)
-        self.blockchar_from_floor.node().setFromCollideMask(FLOOR_MASK)
-        self.blockchar_from_obstacle = self.blockchar.attachNewNode(CollisionNode('blockchar_obstacle'))
-        self.blockchar_from_obstacle.node().addSolid(CollisionSphere(0, 0, 0.35, 0.35))
-        self.blockchar_from_obstacle.node().setCollideMask(0)
-        self.blockchar_from_obstacle.node().setFromCollideMask(OBSTACLE_MASK)
-        self.blockchar_from_zone = self.blockchar.attachNewNode(CollisionNode('blockchar_zone'))
-        self.blockchar_from_zone.node().addSolid(CollisionSphere(0, 0, 0.55, 0.55))
-        self.blockchar_from_zone.node().setCollideMask(0)
-        self.blockchar_from_zone.node().setFromCollideMask(ZONE_MASK)
-
-        self.cam.reparentTo(self.char_rig)
-        self.cam.setPos(0.5, -3, 1.5)
-        self.cam.lookAt(0.5, 0, 1.5)
-
-        self.light = DirectionalLight('dlight')
-        self.light.setColor(VBase4(0.3, 0.28, 0.26, 1.0))
-        self.lightNP = self.stage.attachNewNode(self.light)
-        self.lightNP.setHpr(-75, -45, 0)
-        self.stage.setLight(self.lightNP)
-
-        self.amblight = AmbientLight('amblight')
-        self.amblight.setColor(VBase4(0.7, 0.68, 0.66, 1.0))
-        self.amblightNP = self.stage.attachNewNode(self.amblight)
-        self.stage.setLight(self.amblightNP)
-
+class Character(DirectObject):
+    def __init__(self, name, char_rig):
+        from pandac.PandaModules import CollisionNode, CollisionRay, CollisionSphere
+        self.name = name
+        self.char_rig = char_rig
+        self.actor = Actor('models/robot3', {'run': 'models/robot3-run'})
+        self.actor.setPlayRate(2.0, 'run')
+        self.actor.reparentTo(self.char_rig)
+        self.actor.setCompass()
+        self.actor.setCollideMask(0)
+        self.actor_from_floor = self.actor.attachNewNode(CollisionNode('blockchar_floor'))
+        self.actor_from_floor.node().addSolid(CollisionRay(0, 0, 0.1, 0, 0, -10))
+        self.actor_from_floor.node().setCollideMask(0)
+        self.actor_from_floor.node().setFromCollideMask(FLOOR_MASK)
+        self.actor_from_obstacle = self.actor.attachNewNode(CollisionNode('blockchar_obstacle'))
+        self.actor_from_obstacle.node().addSolid(CollisionSphere(0, 0, 0.35, 0.35))
+        self.actor_from_obstacle.node().setCollideMask(0)
+        self.actor_from_obstacle.node().setFromCollideMask(OBSTACLE_MASK)
+        self.actor_from_zone = self.actor.attachNewNode(CollisionNode('blockchar_zone'))
+        self.actor_from_zone.node().addSolid(CollisionSphere(0, 0, 0.55, 0.55))
+        self.actor_from_zone.node().setCollideMask(0)
+        self.actor_from_zone.node().setFromCollideMask(ZONE_MASK)
         self.move_forward = False
         self.move_left = False
         self.move_backward = False
         self.move_right = False
         self.moving = False
+        self.spinning = False
         self.move_prev_time = None
-        self.accept('w', self.begin_forward)
-        self.accept('a', self.begin_left)
-        self.accept('s', self.begin_backward)
-        self.accept('d', self.begin_right)
-        self.accept('w-up', self.end_forward)
-        self.accept('a-up', self.end_left)
-        self.accept('s-up', self.end_backward)
-        self.accept('d-up', self.end_right)
-        self.taskMgr.add(self.MoveTask, 'MoveTask')
-
-        self.spin = False
-        self.look = False
-        self.prev_pos = None
-        self.accept('mouse2', self.begin_look)
-        self.accept('mouse2-up', self.end_look)
-        self.accept('mouse3', self.begin_spin)
-        self.accept('mouse3-up', self.end_spin)
-        self.taskMgr.add(self.MouseTask, 'MouseTask')
-
         # Based on a jogging speed of 6mph
         self.move_speed = 2.7 # m/s
 
-        self.floor_handler = CollisionHandlerFloor()
-        self.floor_handler.addCollider(self.blockchar_from_floor, self.char_rig)
-        self.wall_handler = CollisionHandlerPusher()
-        self.wall_handler.addCollider(self.blockchar_from_obstacle, self.char_rig)
-        self.zone_handler = CollisionHandlerEvent()
-        self.zone_handler.addInPattern('%fn-into')
-        self.zone_handler.addOutPattern('%fn-out')
-        def foo(entry):
-            print 'You are in the zone'
-        def bar(entry):
-            print 'You are not in the zone'
-        self.accept('blockchar_zone-into', foo)
-        self.accept('blockchar_zone-out', bar)
-        self.cTrav = CollisionTraverser('main traverser')
-        self.cTrav.setRespectPrevTransform(True)
-        self.cTrav.addCollider(self.blockchar_from_floor, self.floor_handler)
-        self.cTrav.addCollider(self.blockchar_from_obstacle, self.wall_handler)
-        self.cTrav.addCollider(self.blockchar_from_zone, self.zone_handler)
-        #self.cTrav.showCollisions(self.stage)
-
     def begin_forward(self):
         self.move_forward = True
-        self.blockchar.loop('run')
+        self.actor.loop('run')
 
     def begin_left(self):
         self.move_left = True
-        self.blockchar.loop('run')
+        self.actor.loop('run')
 
     def begin_backward(self):
         self.move_backward = True
-        self.blockchar.loop('run')
+        self.actor.loop('run')
 
     def begin_right(self):
         self.move_right = True
-        self.blockchar.loop('run')
+        self.actor.loop('run')
 
     def end_forward(self):
         self.move_forward = False
@@ -141,30 +80,6 @@ class FreeBLiTZ(ShowBase):
 
     def end_right(self):
         self.move_right = False
-
-    def begin_spin(self):
-        self.spin = True
-
-    def end_spin(self):
-        self.spin = False
-        self.prev_pos = None
-
-    def begin_look(self):
-        self.look = True
-
-    def end_look(self):
-        self.look = False
-        self.prev_pos = None
-
-    def clamp_deg_sign(self, heading):
-        return (heading + 180) % 360 - 180
-
-    def avg_deg_sign(self, heading1, heading2):
-        if heading2 - heading1 > 180:
-            heading2 -= 360
-        if heading2 - heading1 < -180:
-            heading2 += 360
-        return self.clamp_deg_sign(.85 * heading1 + .15 * heading2)
 
     def MoveTask(self, task):
         keys = 0
@@ -209,30 +124,126 @@ class FreeBLiTZ(ShowBase):
             elif heading == -180:
                 vector = (0, -speed, 0)
 
-            h = self.blockchar.getH()
+            h = self.actor.getH()
             rig_h = self.char_rig.getH()
-            self.blockchar.setH(self.avg_deg_sign(h, rig_h + heading))
-            self.cTrav.traverse(self.stage)
+            self.actor.setH(avg_deg_sign(h, rig_h + heading))
+            app.cTrav.traverse(app.stage)
             self.moving = True
             self.char_rig.setPos(self.char_rig, *vector)
         else:
-            self.blockchar.stop()
+            self.actor.stop()
         self.move_prev_time = task.time
         return task.cont
+
+    def begin_spin(self):
+        self.spinning = True
+
+    def end_spin(self):
+        self.spinning = False
+        self.prev_pos = None
+
+    def spin(self, new_h):
+        if self.spinning and not self.moving:
+            char_new_h = avg_deg_sign(self.actor.getH(), new_h)
+            self.actor.setH(char_new_h)
+
+
+class FreeBLiTZ(ShowBase):
+
+    def __init__(self):
+        from pandac.PandaModules import CollisionHandlerFloor, CollisionHandlerPusher, CollisionHandlerEvent, CollisionTraverser
+        from pandac.PandaModules import DirectionalLight, AmbientLight, VBase4
+        ShowBase.__init__(self)
+
+        self.sky = self.loader.loadModel('models/sky-sphere')
+        self.sky.reparentTo(self.render)
+        self.stage = self.loader.loadModel('models/hillside-road003')
+        self.stage.reparentTo(self.render)
+        self.floor = self.stage.findAllMatches('**/=CollideType=floor')
+        self.floor.setCollideMask(FLOOR_MASK)
+        self.obstacles = self.stage.findAllMatches('**/=CollideType=obstacle')
+        if self.obstacles:
+            self.obstacles.setCollideMask(OBSTACLE_MASK)
+        self.zones = self.stage.findAllMatches('**/=CollideType=zone')
+        if self.zones:
+            self.zones.setCollideMask(ZONE_MASK)
+
+        # Character rig, which allows camera to follow character
+        self.char_rig = self.stage.attachNewNode('char_rig')
+
+        self.active_char = Character('mainchar', self.char_rig)
+
+        self.cam.reparentTo(self.char_rig)
+        self.cam.setPos(0.5, -3, 1.5)
+        self.cam.lookAt(0.5, 0, 1.5)
+
+        self.light = DirectionalLight('dlight')
+        self.light.setColor(VBase4(0.3, 0.28, 0.26, 1.0))
+        self.lightNP = self.stage.attachNewNode(self.light)
+        self.lightNP.setHpr(-75, -45, 0)
+        self.stage.setLight(self.lightNP)
+
+        self.amblight = AmbientLight('amblight')
+        self.amblight.setColor(VBase4(0.7, 0.68, 0.66, 1.0))
+        self.amblightNP = self.stage.attachNewNode(self.amblight)
+        self.stage.setLight(self.amblightNP)
+
+        self.accept('w', self.active_char.begin_forward)
+        self.accept('a', self.active_char.begin_left)
+        self.accept('s', self.active_char.begin_backward)
+        self.accept('d', self.active_char.begin_right)
+        self.accept('w-up', self.active_char.end_forward)
+        self.accept('a-up', self.active_char.end_left)
+        self.accept('s-up', self.active_char.end_backward)
+        self.accept('d-up', self.active_char.end_right)
+        self.taskMgr.add(self.active_char.MoveTask, 'MoveTask')
+
+        self.look = False
+        self.prev_pos = None
+        self.accept('mouse2', self.begin_look)
+        self.accept('mouse2-up', self.end_look)
+        self.accept('mouse3', self.active_char.begin_spin)
+        self.accept('mouse3-up', self.active_char.end_spin)
+        self.taskMgr.add(self.MouseTask, 'MouseTask')
+
+        self.floor_handler = CollisionHandlerFloor()
+        self.floor_handler.addCollider(self.active_char.actor_from_floor, self.char_rig)
+        self.wall_handler = CollisionHandlerPusher()
+        self.wall_handler.addCollider(self.active_char.actor_from_obstacle, self.char_rig)
+        self.zone_handler = CollisionHandlerEvent()
+        self.zone_handler.addInPattern('%fn-into')
+        self.zone_handler.addOutPattern('%fn-out')
+        def foo(entry):
+            print 'You are in the zone'
+        def bar(entry):
+            print 'You are not in the zone'
+        self.accept('blockchar_zone-into', foo)
+        self.accept('blockchar_zone-out', bar)
+        self.cTrav = CollisionTraverser('main traverser')
+        self.cTrav.setRespectPrevTransform(True)
+        self.cTrav.addCollider(self.active_char.actor_from_floor, self.floor_handler)
+        self.cTrav.addCollider(self.active_char.actor_from_obstacle, self.wall_handler)
+        self.cTrav.addCollider(self.active_char.actor_from_zone, self.zone_handler)
+        #self.cTrav.showCollisions(self.stage)
+
+    def begin_look(self):
+        self.look = True
+
+    def end_look(self):
+        self.look = False
+        self.prev_pos = None
 
     def MouseTask(self, task):
         if self.mouseWatcherNode.hasMouse():
             (x, y) = self.mouseWatcherNode.getMouse()
             if self.prev_pos:
-                if self.look or self.spin:
+                if self.look or self.active_char.spinning:
                     h_diff = (x - self.prev_pos[0]) * 180
                     p_diff = (y - self.prev_pos[1]) * 90
-                    new_h = self.clamp_deg_sign(self.char_rig.getH() - h_diff)
+                    new_h = clamp_deg_sign(self.char_rig.getH() - h_diff)
                     self.char_rig.setH(new_h)
                     self.cam.setP(self.cam.getP() + p_diff)
-                if self.spin and not self.moving:
-                    char_new_h = self.avg_deg_sign(self.blockchar.getH(), new_h)
-                    self.blockchar.setH(char_new_h)
+                    self.active_char.spin(new_h)
             self.prev_pos = (x, y)
         return task.cont
 
