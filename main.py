@@ -32,7 +32,7 @@ class Character(DirectObject):
         self.actor.setCompass()
         self.actor.setCollideMask(0)
         self.actor_from_floor = self.actor.attachNewNode(CollisionNode('blockchar_floor'))
-        self.actor_from_floor.node().addSolid(CollisionRay(0, 0, 0.1, 0, 0, -10))
+        self.actor_from_floor.node().addSolid(CollisionRay(0, 0, 0.25, 0, 0, -10))
         self.actor_from_floor.node().setCollideMask(0)
         self.actor_from_floor.node().setFromCollideMask(FLOOR_MASK)
         self.actor_from_obstacle = self.actor.attachNewNode(CollisionNode('blockchar_obstacle'))
@@ -127,7 +127,6 @@ class Character(DirectObject):
             h = self.actor.getH()
             rig_h = self.char_rig.getH()
             self.actor.setH(avg_deg_sign(h, rig_h + heading))
-            app.cTrav.traverse(app.stage)
             self.moving = True
             self.char_rig.setPos(self.char_rig, *vector)
         else:
