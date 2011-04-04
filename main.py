@@ -5,6 +5,7 @@ from direct.actor.Actor import Actor
 from pandac.PandaModules import loadPrcFileData, BitMask32
 loadPrcFileData('', 'win-size 960 600')
 loadPrcFileData('', 'interpolate-frames 1')
+loadPrcFileData('', 'notify-level-collide debug')
 
 FLOOR_MASK = BitMask32(1)
 OBSTACLE_MASK = BitMask32(2)
@@ -128,7 +129,8 @@ class Character(DirectObject):
             rig_h = self.char_rig.getH()
             self.actor.setH(avg_deg_sign(h, rig_h + heading))
             self.moving = True
-            self.char_rig.setPos(self.char_rig, *vector)
+            self.char_rig.setFluidPos(self.char_rig, *vector)
+            print 'POSITION SET'
         else:
             self.actor.stop()
         self.move_prev_time = task.time
@@ -156,7 +158,7 @@ class FreeBLiTZ(ShowBase):
 
         self.sky = self.loader.loadModel('models/sky-sphere')
         self.sky.reparentTo(self.render)
-        self.stage = self.loader.loadModel('models/hillside-road003')
+        self.stage = self.loader.loadModel('models/test-collide')
         self.stage.reparentTo(self.render)
         self.floor = self.stage.findAllMatches('**/=CollideType=floor')
         self.floor.setCollideMask(FLOOR_MASK)
@@ -166,6 +168,7 @@ class FreeBLiTZ(ShowBase):
         self.zones = self.stage.findAllMatches('**/=CollideType=zone')
         if self.zones:
             self.zones.setCollideMask(ZONE_MASK)
+        self.create_stanchions()
 
         # Character rig, which allows camera to follow character
         self.char_rig = self.stage.attachNewNode('char_rig')
@@ -224,6 +227,36 @@ class FreeBLiTZ(ShowBase):
         self.cTrav.addCollider(self.active_char.actor_from_obstacle, self.wall_handler)
         self.cTrav.addCollider(self.active_char.actor_from_zone, self.zone_handler)
         #self.cTrav.showCollisions(self.stage)
+
+    def create_stanchions(self):
+        from pandac.PandaModules import GeomVertexReader, CollisionNode, CollisionTube
+        self.stanchions = self.stage.findAllMatches('**/=Stanchion')
+        for stanchion in self.stanchions:
+            geomnode = stanchion.node()
+            radius = float(stanchion.getTag('Stanchion'))
+            geom = geomnode.getGeom(0)
+            vdata = geom.getVertexData()
+            for gp in range(geom.getNumPrimitives()):
+                vreader = GeomVertexReader(vdata, 'vertex')
+                prim = geom.getPrimitive(gp)
+                prim = prim.decompose()
+                for p in range(prim.getNumPrimitives()):
+                    start = prim.getPrimitiveStart(p)
+                    end = prim.getPrimitiveEnd(p)
+                    vertices = []
+                    for v in range(start, end):
+                        vi = prim.getVertex(v)
+                        vreader.setRow(vi)
+                        vertex = vreader.getData3f()
+                        vertices.append(vertex)
+                    vertices.append(vertices[0])
+                    for i in range(1, len(vertices)):
+                        a, b =  vertices[i-1], vertices[i]
+                        stanchion_np = stanchion.attachNewNode(CollisionNode('stanchion'))
+                        print 'creating cyl with radius %f from %s to %s' % (radius, a, b)
+                        stanchion_np.node().addSolid(CollisionTube(a[0], a[1], a[2], b[0], b[1], b[2], radius))
+                        stanchion_np.node().setFromCollideMask(OBSTACLE_MASK)
+            geomnode.removeAllGeoms()
 
     def begin_look(self):
         self.look = True
